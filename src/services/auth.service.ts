@@ -69,35 +69,26 @@ export function isAuthenticated(): boolean {
  * Logs in with a user name without passwords or credentials.
  * Validates name length and formatting.
  */
+/**
+ * Creates and stores a lightweight local demo session.
+ */
+export function createDemoSession(mode: 'user' | 'organization' = 'user'): DemoUser {
+  const demoUser: DemoUser = {
+    name: 'Security Analyst',
+    mode,
+    loggedIn: true,
+  };
+  saveDemoUser(demoUser);
+  return demoUser;
+}
+
+/**
+ * Logs in with demo access without credentials.
+ */
 export async function loginWithName(
-  name: string
+  name?: string
 ): Promise<{ success: boolean; user: DemoUser; error?: string }> {
-  const trimmed = (name || '').trim();
-
-  if (!trimmed) {
-    return {
-      success: false,
-      user: { name: '', mode: 'user', loggedIn: false },
-      error: 'Please enter your name.',
-    };
-  }
-
-  if (trimmed.length < 2) {
-    return {
-      success: false,
-      user: { name: '', mode: 'user', loggedIn: false },
-      error: 'Name must be at least 2 characters.',
-    };
-  }
-
-  if (trimmed.length > 60) {
-    return {
-      success: false,
-      user: { name: '', mode: 'user', loggedIn: false },
-      error: 'Name must not exceed 60 characters.',
-    };
-  }
-
+  const trimmed = (name || '').trim() || 'Security Analyst';
   const demoUser: DemoUser = {
     name: trimmed,
     mode: 'user',

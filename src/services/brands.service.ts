@@ -2,7 +2,7 @@ import { brands } from '@/data/brands';
 import { monitoredApps } from '@/data/apps';
 import { monitoredSocials } from '@/data/social';
 import { threats } from '@/data/threats';
-import { Brand } from '@/types/brand';
+import { Brand, LogoProvider } from '@/types/brand';
 import { DomainVerificationMethod } from '@/types/verification';
 import { recordAuditLog } from '@/lib/security/audit';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
@@ -255,17 +255,24 @@ export async function createBrand(brandData: Partial<Brand>, organizationId?: st
   const rawWebsite = brandData.website || brandData.official_website || 'example.com';
   const domain = LogoService.cleanDomain(rawWebsite);
 
-  // 1. Resolve Logo.dev logo using Domain-First logic
-  const resolved = LogoService.resolveBrandLogo({
-    name: brandName,
-    website: domain,
-    logo: brandData.logo,
-    logo_url: brandData.logo_url || brandData.logoUrl,
-    logo_provider: brandData.logo_provider || brandData.logoProvider,
-  });
-
-  const finalLogoUrl = resolved.url || LogoService.getBrandLogoUrl(domain);
-  const finalProvider = resolved.provider;
+  // 1. Resolve Logo.dev logo using Domain-First logic with safe fallback
+  let finalLogoUrl = '';
+  let finalProvider: LogoProvider = 'FALLBACK';
+  try {
+    const resolved = LogoService.resolveBrandLogo({
+      name: brandName,
+      website: domain,
+      logo: brandData.logo,
+      logo_url: brandData.logo_url || brandData.logoUrl,
+      logo_provider: brandData.logo_provider || brandData.logoProvider,
+    });
+    finalLogoUrl = resolved.url || (domain ? LogoService.getBrandLogoUrl(domain) : '');
+    finalProvider = resolved.provider || 'LOGO_DEV';
+  } catch (err) {
+    console.warn('[BrandService] Logo resolution fallback triggered:', err);
+    finalLogoUrl = brandData.logo || brandData.logo_url || (domain ? LogoService.getBrandLogoUrl(domain) : '');
+    finalProvider = 'FALLBACK';
+  }
   const nowIso = new Date().toISOString();
 
   const normalizedSlug = brandData.name
@@ -376,11 +383,8 @@ export async function createBrand(brandData: Partial<Brand>, organizationId?: st
         description: newBrand.description || null,
         category: newBrand.category || null,
         logo_url: finalLogoUrl || null,
-        logo_provider: finalProvider,
-        logo_domain: domain || null,
-        logo_last_updated_at: nowIso,
         official_website: newBrand.website,
-        verification_status: newBrand.verificationStatus.toUpperCase(),
+        verification_status: newBrand.verificationStatus.toUpperCase() === 'VERIFIED' ? 'VERIFIED' : 'PENDING',
         verification_confidence: newBrand.verificationConfidence || 0,
         headquarters: newBrand.headquarters || null,
       })
@@ -404,20 +408,21 @@ export async function createBrand(brandData: Partial<Brand>, organizationId?: st
       }
     }
 
-    // Insert official apps if provided
+    // Insert official apps if provided (using only columns present in DB schema)
     if (newBrand.officialApps && newBrand.officialApps.length > 0) {
       const appInserts = newBrand.officialApps.map((a) => ({
         organization_id: organizationId,
         brand_id: insertedBrand.id,
         name: a.name,
-        developer_name: a.developer,
-        platform: a.platform === 'Apple App Store' ? 'IOS' : 'ANDROID',
-        icon_url: a.icon || finalLogoUrl,
+        developer_name: a.developer || newBrand.company || newBrand.name,
+        platform: a.platform === 'Apple App Store' || (a.platform as string) === 'IOS' ? 'IOS' : 'ANDROID',
+        icon_url: a.icon || finalLogoUrl || null,
         package_id: a.packageId || a.bundleId || null,
         bundle_id: a.bundleId || null,
+        store_url: a.storeUrl || null,
+        description: a.description || null,
+        source: 'ORGANIZATION_PROFILE',
         verification_status: 'VERIFIED',
-        verification_confidence: 95,
-        relationship_type: a.relationshipType || 'DIRECT_OFFICIAL',
       }));
       try {
         await supabase.from('official_apps').insert(appInserts);
@@ -426,18 +431,22 @@ export async function createBrand(brandData: Partial<Brand>, organizationId?: st
       }
     }
 
-    // Insert official socials if provided
+    // Insert official socials if provided (using only columns present in DB schema)
     if (newBrand.officialSocials && newBrand.officialSocials.length > 0) {
-      const socialInserts = newBrand.officialSocials.map((s) => ({
-        organization_id: organizationId,
-        brand_id: insertedBrand.id,
-        platform: s.platform.toUpperCase(),
-        username: s.handle.replace('@', ''),
-        profile_url: s.url,
-        verification_status: 'VERIFIED_OFFICIAL',
-        verification_confidence: 95,
-        relationship_type: s.relationshipType || 'DIRECT_OFFICIAL',
-      }));
+      const validPlatforms = ['INSTAGRAM', 'X', 'YOUTUBE', 'FACEBOOK', 'TIKTOK', 'LINKEDIN', 'TELEGRAM'];
+      const socialInserts = newBrand.officialSocials.map((s) => {
+        const rawPlat = s.platform.toUpperCase();
+        const platform = validPlatforms.includes(rawPlat) ? rawPlat : 'X';
+        return {
+          organization_id: organizationId,
+          brand_id: insertedBrand.id,
+          platform,
+          username: s.handle.replace(/^@/, ''),
+          profile_url: s.url,
+          verification_status: 'VERIFIED',
+          source: 'ORGANIZATION_PROFILE',
+        };
+      });
       try {
         await supabase.from('official_social_accounts').insert(socialInserts);
       } catch {
@@ -452,6 +461,7 @@ export async function createBrand(brandData: Partial<Brand>, organizationId?: st
       entityId: insertedBrand.id,
       metadata: { name: insertedBrand.name, website: insertedBrand.website, domain, logoProvider: finalProvider },
     });
+    brands.unshift(insertedBrand);
     return insertedBrand;
   }
 
@@ -550,9 +560,6 @@ export async function refreshBrandLogo(brandId: string, organizationId?: string)
       .from('brands')
       .update({
         logo_url: newLogoUrl,
-        logo_provider: 'LOGO_DEV',
-        logo_domain: domain,
-        logo_last_updated_at: nowIso,
       })
       .eq('id', brand.id);
     if (organizationId) update = update.eq('organization_id', organizationId);

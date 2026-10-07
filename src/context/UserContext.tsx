@@ -22,7 +22,7 @@ export interface UserContextType {
   user: DemoUser | null;
   mode: 'user' | 'organization';
   setMode: (mode: 'user' | 'organization') => void;
-  login: (name: string) => Promise<{ success: boolean; user?: DemoUser; error?: string }>;
+  login: (name?: string) => Promise<{ success: boolean; user?: DemoUser; error?: string }>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -74,7 +74,7 @@ export function UserContextProvider({ children }: { children: React.ReactNode })
     }
   }, []);
 
-  const login = useCallback(async (name: string) => {
+  const login = useCallback(async (name?: string) => {
     const res = await loginWithName(name);
     if (res.success && res.user) {
       setUser(res.user);
