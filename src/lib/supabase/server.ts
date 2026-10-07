@@ -1,11 +1,24 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { createAdminClient } from './admin';
 
 export async function createClient(): Promise<SupabaseClient> {
   if (typeof window !== 'undefined') {
     const { createClient: createBrowserClient } = await import('./client');
     return createBrowserClient();
   }
+
+  // When server service role credentials are configured, use the admin client
+  // so server-side operations bypass Row Level Security policies
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (serviceKey && !serviceKey.includes('your-service-role-key') && !serviceKey.includes('placeholder')) {
+    try {
+      return createAdminClient();
+    } catch {
+      // Fallback to cookie client below
+    }
+  }
+
   const { cookies } = await import('next/headers');
   const cookieStore = await cookies();
 
