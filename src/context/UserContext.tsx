@@ -15,6 +15,7 @@ import {
   saveDemoUser,
   loginWithName,
   logout as authLogout,
+  createDemoSession,
   isAuthenticated as checkIsAuthenticated,
 } from '@/services/auth.service';
 
@@ -52,6 +53,9 @@ export function UserContextProvider({ children }: { children: React.ReactNode })
       if (stored && stored.loggedIn) {
         const savedMode = (localStorage.getItem('brandguard_mode') as 'user' | 'organization') || stored.mode || 'user';
         setUser({ ...stored, mode: savedMode });
+      } else {
+        const initialSession = createDemoSession('user');
+        setUser(initialSession);
       }
       setIsLoading(false);
     }
@@ -89,8 +93,9 @@ export function UserContextProvider({ children }: { children: React.ReactNode })
 
   const logout = useCallback(async () => {
     await authLogout();
-    setUser(null);
-    router.push('/login');
+    const fresh = createDemoSession('user');
+    setUser(fresh);
+    router.push('/dashboard');
   }, [router]);
 
   const value = useMemo(

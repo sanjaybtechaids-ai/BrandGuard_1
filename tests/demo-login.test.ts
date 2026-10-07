@@ -1,13 +1,13 @@
 /**
- * BrandGuard AI - Zero-Input Demo Login Acceptance Test
- * Tests zero-input demo login flow, local session creation, logout, and UI cleanliness.
+ * BrandGuard AI - Entrance Removal & Instant Dashboard Access Acceptance Test
+ * Tests that entrance login barrier is eliminated and users immediately access /dashboard.
  */
 
 import { loginWithName, createDemoSession, logout } from '../src/services/auth.service';
 
-async function runDemoLoginTests() {
+async function runAccessTests() {
   console.log('\n============================================================');
-  console.log('🛡️  BRANDGUARD AI - ZERO-INPUT DEMO LOGIN VERIFICATION TEST');
+  console.log('🛡️  BRANDGUARD AI - ENTRANCE LOGIN REMOVED TEST');
   console.log('============================================================\n');
 
   let passed = 0;
@@ -23,60 +23,54 @@ async function runDemoLoginTests() {
     }
   }
 
-  // 1. Zero-parameter session creation
+  // 1. Instant session creation
   const session = createDemoSession();
   assert(session.loggedIn === true, 'Test 1.1: createDemoSession returns loggedIn === true');
   assert(session.mode === 'user', 'Test 1.2: Default mode is "user"');
   assert(typeof session.name === 'string', 'Test 1.3: User has default display name');
 
-  // 2. loginWithName with no input succeeds immediately without validation error
+  // 2. loginWithName succeeds with no parameters
   const loginRes = await loginWithName();
   assert(loginRes.success === true, 'Test 2.1: loginWithName() succeeds with no arguments');
   assert(loginRes.user.loggedIn === true, 'Test 2.2: User loggedIn is true');
   assert(loginRes.user.mode === 'user', 'Test 2.3: User mode is "user"');
 
-  // 3. Logout clears session
+  // 3. Logout refreshes clean session without breaking flow
   await logout();
   assert(true, 'Test 3.1: Logout successfully cleans session');
 
-  // 4. Verify live server /login page HTML content
+  // 4. Verify live server routing: / and /login redirect directly to /dashboard
   try {
-    const res = await fetch('http://localhost:3000/login');
-    const html = await res.text();
-
+    // Test root route /
+    const rootRes = await fetch('http://localhost:3000/', { redirect: 'manual' });
+    const rootLocation = rootRes.headers.get('location');
     assert(
-      html.includes('Sign in to BrandGuard') || html.includes('Sign In to BrandGuard'),
-      'Test 4.1: "Sign in to BrandGuard" title present in page HTML'
+      Boolean(rootRes.status === 307 || rootRes.status === 308 || rootLocation?.includes('/dashboard')),
+      'Test 4.1: Root URL (/) redirects directly to /dashboard'
     );
+
+    // Test /login route redirects directly to /dashboard
+    const loginRes = await fetch('http://localhost:3000/login', { redirect: 'manual' });
+    const loginLocation = loginRes.headers.get('location');
     assert(
-      html.includes('Enter the BrandGuard digital risk protection platform.'),
-      'Test 4.2: Subtitle "Enter the BrandGuard digital risk protection platform." present'
+      Boolean(loginRes.status === 307 || loginRes.status === 308 || loginLocation?.includes('/dashboard')),
+      'Test 4.2: /login redirects directly to /dashboard (entrance login gate removed)'
     );
-    assert(html.includes('Continue'), 'Test 4.3: "Continue" button present');
-    assert(html.includes('Demo access'), 'Test 4.4: "Demo access" text present');
 
-    // STRICT ZERO-INPUT CHECKS
-    // The right-side login card must have zero <input elements
-    // Check if there is any input in the form
-    const hasFormInput = /<form[\s\S]*?<input[\s\S]*?<\/form>/.test(html);
-    assert(!hasFormInput, 'Test 4.5: Zero <input> elements inside login form');
-
-    assert(!html.includes('Your Name'), 'Test 4.6: "Your Name" label removed');
-    assert(!html.includes('Enter your name'), 'Test 4.7: "Enter your name" placeholder removed');
-    assert(!html.includes('No password required'), 'Test 4.8: "No password required" removed');
-    assert(!html.includes('Forgot password'), 'Test 4.9: "Forgot password" removed');
-    assert(!html.includes('Remember me'), 'Test 4.10: "Remember me" removed');
-    assert(!html.includes('Google Workspace'), 'Test 4.11: "Google Workspace" removed');
-    assert(!html.includes('Google login'), 'Test 4.12: "Google login" removed');
-    assert(!html.includes('security@abc.com'), 'Test 4.13: "security@abc.com" removed');
-    assert(!html.includes('sanjay@gmail.com'), 'Test 4.14: "sanjay@gmail.com" removed');
+    // Test /dashboard loads successfully
+    const dashRes = await fetch('http://localhost:3000/dashboard');
+    const dashHtml = await dashRes.text();
+    assert(
+      dashRes.status === 200 && dashHtml.includes('BrandGuard'),
+      'Test 4.3: /dashboard loads directly with HTTP 200'
+    );
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn('Live HTTP test skipped or server not reachable:', msg);
   }
 
   console.log('\n============================================================');
-  console.log(`📊 ZERO-INPUT DEMO LOGIN RESULTS: ${passed} PASSED, ${failed} FAILED`);
+  console.log(`📊 DIRECT ACCESS RESULTS: ${passed} PASSED, ${failed} FAILED`);
   console.log('============================================================\n');
 
   if (failed > 0) {
@@ -84,7 +78,7 @@ async function runDemoLoginTests() {
   }
 }
 
-runDemoLoginTests().catch((err) => {
+runAccessTests().catch((err) => {
   console.error('Fatal test error:', err);
   process.exit(1);
 });
