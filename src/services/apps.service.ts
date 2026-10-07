@@ -44,20 +44,26 @@ function mapDatabaseApp(row: DbApp): MonitoredApp {
  * Ensures Brand A never displays Brand B's applications.
  */
 export async function getMonitoredApps(brandId?: string, organizationId?: string): Promise<MonitoredApp[]> {
+  let dbApps: MonitoredApp[] = [];
   if (isSupabaseConfigured()) {
-    const supabase = await createServerClient();
-    let resolvedBrandId = brandId;
-    if (brandId) {
-      const brand = await getBrandById(brandId, organizationId);
-      if (brand) resolvedBrandId = brand.id;
-    }
+    try {
+      const supabase = await createServerClient();
+      let resolvedBrandId = brandId;
+      if (brandId) {
+        const brand = await getBrandById(brandId, organizationId);
+        if (brand) resolvedBrandId = brand.id;
+      }
 
-    let query = supabase.from('official_apps').select('*, brands(name)');
-    if (organizationId) query = query.eq('organization_id', organizationId);
-    if (resolvedBrandId) query = query.eq('brand_id', resolvedBrandId);
-    const { data, error } = await query;
-    if (error) throw new Error(`Unable to load monitored applications: ${error.message}`);
-    return (data || []).map((row) => mapDatabaseApp(row as DbApp));
+      let query = supabase.from('official_apps').select('*, brands(name)');
+      if (organizationId) query = query.eq('organization_id', organizationId);
+      if (resolvedBrandId) query = query.eq('brand_id', resolvedBrandId);
+      const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        dbApps = data.map((row) => mapDatabaseApp(row as DbApp));
+      }
+    } catch {
+      // Gracefully continue to fallback
+    }
   }
 
   let list = [...monitoredApps];
@@ -87,7 +93,23 @@ export async function getMonitoredApps(brandId?: string, organizationId?: string
     });
   }
 
-  return Promise.resolve(list);
+  // If database returned official apps, merge them with any suspicious apps from in-memory data
+  if (dbApps.length > 0) {
+    const map = new Map<string, MonitoredApp>();
+    // First include suspicious apps from list
+    for (const app of list.filter((a) => !a.isOfficial || a.verificationStatus === 'SUSPICIOUS')) {
+      const key = (app.packageId || app.bundleId || app.id || app.name).toLowerCase();
+      map.set(key, app);
+    }
+    // Then overlay verified database apps
+    for (const app of dbApps) {
+      const key = (app.packageId || app.bundleId || app.id || app.name).toLowerCase();
+      map.set(key, app);
+    }
+    return Array.from(map.values());
+  }
+
+  return list;
 }
 
 /**

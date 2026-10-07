@@ -66,12 +66,26 @@ function toOfficialSocial(row: DbRecord): NonNullable<Brand['officialSocials']>[
 }
 
 function mapDatabaseBrand(row: DbRecord): Brand {
-  const officialApps = Array.isArray(row.official_apps) ? row.official_apps.map((app) => toOfficialApp(app as DbRecord)) : [];
-  const officialSocials = Array.isArray(row.official_social_accounts)
-    ? row.official_social_accounts.map((social) => toOfficialSocial(social as DbRecord))
-    : [];
   const website = String(row.official_website || '');
   const name = String(row.name || 'Unnamed brand');
+  const cleanId = String(row.id || '').toLowerCase();
+  const cleanName = name.toLowerCase();
+
+  const fallbackBrand = brands.find(
+    (b) =>
+      b.name.toLowerCase() === cleanName ||
+      (b.id && b.id.toLowerCase() === cleanId) ||
+      (b.canonical_domain && website.includes(b.canonical_domain))
+  );
+
+  const rawApps = Array.isArray(row.official_apps) ? row.official_apps.map((app) => toOfficialApp(app as DbRecord)) : [];
+  const officialApps = rawApps.length > 0 ? rawApps : (fallbackBrand?.officialApps || []);
+
+  const rawSocials = Array.isArray(row.official_social_accounts)
+    ? row.official_social_accounts.map((social) => toOfficialSocial(social as DbRecord))
+    : [];
+  const officialSocials = rawSocials.length > 0 ? rawSocials : (fallbackBrand?.officialSocials || []);
+
   const logoUrl = typeof row.logo_url === 'string' ? row.logo_url : LogoService.getBrandLogoUrl(LogoService.cleanDomain(website));
 
   return enrichBrandWithLogoDev({
@@ -461,6 +475,15 @@ export async function createBrand(brandData: Partial<Brand>, organizationId?: st
       entityId: insertedBrand.id,
       metadata: { name: insertedBrand.name, website: insertedBrand.website, domain, logoProvider: finalProvider },
     });
+    if (newBrand.officialApps && newBrand.officialApps.length > 0) {
+      insertedBrand.officialApps = newBrand.officialApps.map((a) => ({ ...a, brandId: insertedBrand.id, organizationId }));
+      insertedBrand.officialAppsCount = insertedBrand.officialApps.length;
+    }
+    if (newBrand.officialSocials && newBrand.officialSocials.length > 0) {
+      insertedBrand.officialSocials = newBrand.officialSocials.map((s) => ({ ...s, brandId: insertedBrand.id, organizationId }));
+      insertedBrand.officialSocialsCount = insertedBrand.officialSocials.length;
+    }
+
     brands.unshift(insertedBrand);
     return insertedBrand;
   }

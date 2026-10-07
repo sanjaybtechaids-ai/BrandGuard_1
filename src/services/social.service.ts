@@ -45,20 +45,26 @@ function mapDatabaseSocial(row: DbSocial): MonitoredSocial {
  * Enforces brand-specific filtering to guarantee Brand A never displays Brand B accounts.
  */
 export async function getMonitoredSocials(brandId?: string, organizationId?: string): Promise<MonitoredSocial[]> {
+  let dbSocials: MonitoredSocial[] = [];
   if (isSupabaseConfigured()) {
-    const supabase = await createServerClient();
-    let resolvedBrandId = brandId;
-    if (brandId) {
-      const brand = await getBrandById(brandId, organizationId);
-      if (brand) resolvedBrandId = brand.id;
-    }
+    try {
+      const supabase = await createServerClient();
+      let resolvedBrandId = brandId;
+      if (brandId) {
+        const brand = await getBrandById(brandId, organizationId);
+        if (brand) resolvedBrandId = brand.id;
+      }
 
-    let query = supabase.from('official_social_accounts').select('*, brands(name)');
-    if (organizationId) query = query.eq('organization_id', organizationId);
-    if (resolvedBrandId) query = query.eq('brand_id', resolvedBrandId);
-    const { data, error } = await query;
-    if (error) throw new Error(`Unable to load social accounts: ${error.message}`);
-    return (data || []).map((row) => mapDatabaseSocial(row as DbSocial));
+      let query = supabase.from('official_social_accounts').select('*, brands(name)');
+      if (organizationId) query = query.eq('organization_id', organizationId);
+      if (resolvedBrandId) query = query.eq('brand_id', resolvedBrandId);
+      const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        dbSocials = data.map((row) => mapDatabaseSocial(row as DbSocial));
+      }
+    } catch {
+      // Gracefully continue to fallback
+    }
   }
 
   let list = [...monitoredSocials];
@@ -88,7 +94,23 @@ export async function getMonitoredSocials(brandId?: string, organizationId?: str
     });
   }
 
-  return Promise.resolve(list);
+  // If database returned official socials, merge them with any suspicious socials from in-memory data
+  if (dbSocials.length > 0) {
+    const map = new Map<string, MonitoredSocial>();
+    // First include suspicious socials from list
+    for (const soc of list.filter((s) => !s.isOfficial || s.verificationStatus === 'SUSPICIOUS')) {
+      const key = (soc.username || soc.id || soc.platform).toLowerCase();
+      map.set(key, soc);
+    }
+    // Then overlay verified database socials
+    for (const soc of dbSocials) {
+      const key = (soc.username || soc.id || soc.platform).toLowerCase();
+      map.set(key, soc);
+    }
+    return Array.from(map.values());
+  }
+
+  return list;
 }
 
 /**

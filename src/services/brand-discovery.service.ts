@@ -586,6 +586,57 @@ export class BrandDiscoveryService {
         }
       }
 
+      if (isSupabaseConfigured()) {
+        try {
+          const supabase = createAdminClient();
+          await supabase
+            .from('brands')
+            .update({
+              verification_status: 'VERIFIED',
+              verification_confidence: result.confidenceScore,
+            })
+            .eq('id', existing.id);
+
+          if (officialAppsList.length > 0) {
+            const appInserts = officialAppsList.map((a) => ({
+              organization_id: organizationId,
+              brand_id: existing.id,
+              name: a.name,
+              developer_name: a.developer || existing.name,
+              platform: a.platform === 'Apple App Store' || (a.platform as string) === 'IOS' ? 'IOS' : 'ANDROID',
+              icon_url: a.icon || existing.logo || null,
+              package_id: a.packageId || a.bundleId || null,
+              bundle_id: a.bundleId || null,
+              store_url: a.storeUrl || null,
+              description: a.description || null,
+              source: 'ORGANIZATION_PROFILE',
+              verification_status: 'VERIFIED',
+            }));
+            await supabase.from('official_apps').insert(appInserts);
+          }
+
+          if (officialSocialsList.length > 0) {
+            const validPlatforms = ['INSTAGRAM', 'X', 'YOUTUBE', 'FACEBOOK', 'TIKTOK', 'LINKEDIN', 'TELEGRAM'];
+            const socialInserts = officialSocialsList.map((s) => {
+              const rawPlat = s.platform.toUpperCase();
+              const platform = validPlatforms.includes(rawPlat) ? rawPlat : 'X';
+              return {
+                organization_id: organizationId,
+                brand_id: existing.id,
+                platform,
+                username: s.handle.replace(/^@/, ''),
+                profile_url: s.url,
+                verification_status: 'VERIFIED',
+                source: 'ORGANIZATION_PROFILE',
+              };
+            });
+            await supabase.from('official_social_accounts').insert(socialInserts);
+          }
+        } catch (err) {
+          console.warn('Failed to persist official assets to Supabase for existing brand:', err);
+        }
+      }
+
       savedBrand = existing;
     } else {
       savedBrand = await createBrand(
