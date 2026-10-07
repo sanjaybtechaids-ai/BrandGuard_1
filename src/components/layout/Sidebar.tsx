@@ -21,8 +21,8 @@ import {
   User,
 } from 'lucide-react';
 import { alertsList } from '@/data/alerts';
-import { currentOrganization, currentUser } from '@/data/users';
 import { useBrandContext } from '@/context/BrandContext';
+import { useUser } from '@/context/UserContext';
 
 interface SidebarProps {
   onCloseMobile?: () => void;
@@ -32,8 +32,12 @@ interface SidebarProps {
 export function Sidebar({ onCloseMobile, onOpenScanModal }: SidebarProps) {
   const pathname = usePathname();
   const { mode, selectedOrganization, setSelectedOrganizationId, availableOrganizations } = useBrandContext();
+  const { user } = useUser();
   const [showOrgDropdown, setShowOrgDropdown] = useState(false);
   const unreadAlertsCount = alertsList.filter((a) => !a.read).length;
+
+  const displayName = user?.name || 'User';
+  const displayInitial = displayName[0]?.toUpperCase() || 'U';
 
   const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -136,7 +140,7 @@ export function Sidebar({ onCloseMobile, onOpenScanModal }: SidebarProps) {
         })}
       </div>
 
-      {/* Bottom Profile and Organization (Parts 29, 31, 35, 51) */}
+      {/* Bottom Profile and Organization */}
       <div className="p-3.5 border-t border-slate-100 dark:border-slate-800/80 space-y-2">
         {mode === 'organization' ? (
           <>
@@ -153,7 +157,7 @@ export function Sidebar({ onCloseMobile, onOpenScanModal }: SidebarProps) {
                   <div className="truncate">
                     <span className="text-[10px] text-slate-400 block font-medium">Organization</span>
                     <p className="text-xs font-bold text-slate-800 dark:text-white truncate">
-                      {selectedOrganization.name}
+                      {selectedOrganization?.name || 'Select Organization'}
                     </p>
                   </div>
                 </div>
@@ -206,11 +210,11 @@ export function Sidebar({ onCloseMobile, onOpenScanModal }: SidebarProps) {
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-lg bg-teal-800 dark:bg-teal-700 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
-                  S
+                  {displayInitial}
                 </div>
                 <div className="truncate">
                   <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                    {currentUser.name}
+                    {displayName}
                   </p>
                   <p className="text-[10px] text-slate-400 truncate font-medium">
                     Security Analyst
@@ -221,7 +225,7 @@ export function Sidebar({ onCloseMobile, onOpenScanModal }: SidebarProps) {
             </Link>
           </>
         ) : (
-          /* User Mode: Clean minimal profile without organization identity (Parts 29, 35, 51) */
+          /* User Mode: Clean minimal profile without organization identity */
           <Link
             href="/settings"
             className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
@@ -232,10 +236,10 @@ export function Sidebar({ onCloseMobile, onOpenScanModal }: SidebarProps) {
               </div>
               <div className="truncate">
                 <p className="text-xs font-bold text-slate-800 dark:text-white truncate">
-                  User Account
+                  {displayName}
                 </p>
                 <p className="text-[10px] text-slate-400 truncate font-medium">
-                  {currentUser.email}
+                  User Mode
                 </p>
               </div>
             </div>

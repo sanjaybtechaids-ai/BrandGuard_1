@@ -14,8 +14,15 @@ import { Brand } from '@/types/brand';
 import { Organization } from '@/types/user';
 import { brands as fallbackBrands } from '@/data/brands';
 import { availableOrganizations } from '@/data/users';
+import { useUser } from './UserContext';
 
 export type AppMode = 'user' | 'organization';
+
+export type MonitoringContext = {
+  mode: 'user' | 'organization';
+  organizationId?: string;
+  brandId?: string;
+};
 
 export interface BrandContextType {
   mode: AppMode;
@@ -31,12 +38,17 @@ export interface BrandContextType {
   setSelectedBrand: (brand: Brand | null) => void;
   refreshBrands: () => Promise<void>;
   isLoading: boolean;
+  monitoringContext: MonitoringContext;
 }
+
+const defaultMonitoringContext: MonitoringContext = {
+  mode: 'user',
+};
 
 const defaultContextValue: BrandContextType = {
   mode: 'user',
   setMode: () => {},
-  selectedOrganizationId: availableOrganizations[0]?.id || 'a0000000-0000-0000-0000-000000000001',
+  selectedOrganizationId: '',
   selectedOrganization: availableOrganizations[0],
   availableOrganizations,
   setSelectedOrganizationId: () => {},
@@ -47,6 +59,7 @@ const defaultContextValue: BrandContextType = {
   setSelectedBrand: () => {},
   refreshBrands: async () => {},
   isLoading: false,
+  monitoringContext: defaultMonitoringContext,
 };
 
 const BrandContext = createContext<BrandContextType>(defaultContextValue);
@@ -68,11 +81,12 @@ function SearchParamsSync({ onSync }: { onSync: (brand: string | null) => void }
 }
 
 export function BrandContextProvider({ children }: { children: React.ReactNode }) {
-  // Mode: Default to 'user' per PART 27
-  const [mode, setModeState] = useState<AppMode>('user');
+  // Mode from global UserContext
+  const { mode, setMode } = useUser();
 
-  // Organization: Separate from brand per PART 3, 4, 5
-  const [selectedOrganizationId, setSelectedOrganizationIdState] = useState<string>(() => {
+  // Organization state: Only active when in organization mode.
+  // In user mode: No organization automatically selected per requirements.
+  const [storedOrgId, setStoredOrgId] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const savedOrg = localStorage.getItem('brandguard_selected_org');
       if (savedOrg && availableOrganizations.some((o) => o.id === savedOrg)) {
@@ -89,37 +103,21 @@ export function BrandContextProvider({ children }: { children: React.ReactNode }
   const [selectedBrandId, setSelectedBrandIdState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Sync mode from localStorage on mount
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedMode = localStorage.getItem('brandguard_mode') as AppMode | null;
-      if (savedMode === 'user' || savedMode === 'organization') {
-        setModeState(savedMode);
-      }
-    }
-  }, []);
-
-  const setMode = useCallback((newMode: AppMode) => {
-    setModeState(newMode);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('brandguard_mode', newMode);
-      window.dispatchEvent(new CustomEvent('brandguard:mode-changed', { detail: { mode: newMode } }));
-    }
-  }, []);
-
   const setSelectedOrganizationId = useCallback((orgId: string) => {
-    setSelectedOrganizationIdState(orgId);
+    setStoredOrgId(orgId);
     if (typeof window !== 'undefined') {
       localStorage.setItem('brandguard_selected_org', orgId);
     }
   }, []);
 
+  const selectedOrganizationId = mode === 'organization' ? storedOrgId : '';
+
   const selectedOrganization = useMemo(() => {
     return (
-      availableOrganizations.find((o) => o.id === selectedOrganizationId) ||
+      availableOrganizations.find((o) => o.id === storedOrgId) ||
       availableOrganizations[0]
     );
-  }, [selectedOrganizationId]);
+  }, [storedOrgId]);
 
   // Fetch available brands from server
   const refreshBrands = useCallback(async () => {
@@ -158,7 +156,7 @@ export function BrandContextProvider({ children }: { children: React.ReactNode }
     };
   }, [refreshBrands]);
 
-  // Initial selection from localStorage if valid
+  // Initial brand selection from localStorage if valid
   useEffect(() => {
     if (!selectedBrandId && availableBrands.length > 0) {
       const stored = typeof window !== 'undefined' ? localStorage.getItem('brandguard_selected_brand') : null;
@@ -175,7 +173,7 @@ export function BrandContextProvider({ children }: { children: React.ReactNode }
     }
   }, [availableBrands, selectedBrandId]);
 
-  // Handle brand deletion: if selected brand was removed, clear context per Part 67/68
+  // Handle brand deletion: if selected brand was removed, clear context
   useEffect(() => {
     if (selectedBrandId && availableBrands.length > 0) {
       const clean = selectedBrandId.toLowerCase().trim();
@@ -214,7 +212,7 @@ export function BrandContextProvider({ children }: { children: React.ReactNode }
     [availableBrands]
   );
 
-  // Compute selectedBrand object: returns null if no valid brand selected per Part 42 & 60
+  // Compute selectedBrand object: returns null if no valid brand selected
   const selectedBrand = useMemo<Brand | null>(() => {
     if (!selectedBrandId) {
       return null;
@@ -254,6 +252,16 @@ export function BrandContextProvider({ children }: { children: React.ReactNode }
     [setSelectedBrandId]
   );
 
+  // Canonical MonitoringContext: selectedBrandId is the single canonical brand context
+  const monitoringContext = useMemo<MonitoringContext>(
+    () => ({
+      mode,
+      organizationId: mode === 'organization' ? storedOrgId : undefined,
+      brandId: selectedBrand?.id || selectedBrandId || undefined,
+    }),
+    [mode, storedOrgId, selectedBrand?.id, selectedBrandId]
+  );
+
   const value = useMemo(
     () => ({
       mode,
@@ -269,13 +277,13 @@ export function BrandContextProvider({ children }: { children: React.ReactNode }
       setSelectedBrand,
       refreshBrands,
       isLoading,
+      monitoringContext,
     }),
     [
       mode,
       setMode,
       selectedOrganizationId,
       selectedOrganization,
-      availableOrganizations,
       setSelectedOrganizationId,
       selectedBrandId,
       selectedBrand,
@@ -284,6 +292,7 @@ export function BrandContextProvider({ children }: { children: React.ReactNode }
       setSelectedBrand,
       refreshBrands,
       isLoading,
+      monitoringContext,
     ]
   );
 

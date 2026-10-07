@@ -3,15 +3,14 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, Bell, ChevronDown, Menu, Globe, Sparkles, Shield } from 'lucide-react';
+import { Search, Bell, ChevronDown, Menu, Globe, Sparkles } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { alertsList } from '@/data/alerts';
-import { currentUser } from '@/data/users';
 import { UrlVerificationModal } from '@/components/verification/UrlVerificationModal';
 import { detectSearchInputType } from '@/components/common/SearchBar';
 import { useBrandContext } from '@/context/BrandContext';
-import { BrandLogo } from '@/components/common/BrandLogo';
 import { BrandSelector } from '@/components/common/BrandSelector';
+import { useUser } from '@/context/UserContext';
 
 interface TopbarProps {
   onOpenMobileMenu: () => void;
@@ -19,11 +18,15 @@ interface TopbarProps {
 
 export function Topbar({ onOpenMobileMenu }: TopbarProps) {
   const router = useRouter();
-  const { mode, setMode, selectedBrand } = useBrandContext();
+  const { mode, setMode } = useBrandContext();
+  const { user, logout } = useUser();
   const [searchValue, setSearchValue] = useState('');
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [urlVerificationModalOpen, setUrlVerificationModalOpen] = useState(false);
   const [verificationTargetUrl, setVerificationTargetUrl] = useState('');
+
+  const displayName = user?.name || 'User';
+  const displayInitial = displayName[0]?.toUpperCase() || 'U';
 
   const unreadAlerts = alertsList.filter((a) => !a.read);
   const inputType = detectSearchInputType(searchValue);
@@ -47,6 +50,11 @@ export function Topbar({ onOpenMobileMenu }: TopbarProps) {
   const handleLaunchVerification = (urlToVerify?: string) => {
     setVerificationTargetUrl(urlToVerify || searchValue);
     setUrlVerificationModalOpen(true);
+  };
+
+  const handleSignOut = async () => {
+    setUserDropdownOpen(false);
+    await logout();
   };
 
   return (
@@ -96,7 +104,7 @@ export function Topbar({ onOpenMobileMenu }: TopbarProps) {
 
         {/* Right: Brand Indicator, Mode Selector, Quick URL Verify Button, Notifications, User Avatar pill & Theme toggle */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-3">
-          {/* Active Brand Scope Selector & Indicator (Part 50, 53) */}
+          {/* Active Brand Scope Selector & Indicator */}
           <div className="hidden xl:flex items-center gap-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
               Monitoring
@@ -104,7 +112,7 @@ export function Topbar({ onOpenMobileMenu }: TopbarProps) {
             <BrandSelector size="sm" showAllOption={false} placeholder="Select Brand..." />
           </div>
 
-          {/* Top-Right Mode Selector (Part 28) */}
+          {/* Top-Right Mode Selector */}
           <div
             className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 text-[11px] font-semibold shadow-2xs"
             role="group"
@@ -166,10 +174,10 @@ export function Topbar({ onOpenMobileMenu }: TopbarProps) {
               className="flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-sm transition-all"
             >
               <div className="w-7 h-7 rounded-full bg-teal-800 dark:bg-teal-700 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                S
+                {displayInitial}
               </div>
               <span className="text-xs font-semibold text-slate-800 dark:text-white hidden sm:inline">
-                {currentUser.name}
+                {displayName}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </button>
@@ -177,8 +185,10 @@ export function Topbar({ onOpenMobileMenu }: TopbarProps) {
             {userDropdownOpen && (
               <div className="absolute right-0 mt-1.5 w-48 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 rounded-2xl shadow-xl z-40 p-1.5 text-xs">
                 <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700/60 mb-1">
-                  <p className="font-bold text-slate-900 dark:text-white">{currentUser.name}</p>
-                  <p className="text-[11px] text-slate-400">{currentUser.email}</p>
+                  <p className="font-bold text-slate-900 dark:text-white">{displayName}</p>
+                  <p className="text-[11px] text-slate-400">
+                    {mode === 'organization' ? 'Organization Mode' : 'User Mode'}
+                  </p>
                   <span className="inline-block mt-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">
                     {mode === 'organization' ? 'Security Analyst' : 'User'}
                   </span>
@@ -199,13 +209,13 @@ export function Topbar({ onOpenMobileMenu }: TopbarProps) {
                     Team Access
                   </Link>
                 )}
-                <Link
-                  href="/login"
-                  onClick={() => setUserDropdownOpen(false)}
-                  className="block px-3 py-2 rounded-xl text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="w-full text-left block px-3 py-2 rounded-xl text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer"
                 >
                   Sign Out
-                </Link>
+                </button>
               </div>
             )}
           </div>

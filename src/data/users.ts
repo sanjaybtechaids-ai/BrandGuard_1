@@ -3,7 +3,7 @@ import { User, Organization } from '@/types/user';
 export const currentUser: User = {
   id: 'usr-sanjay-01',
   name: 'Sanjay',
-  email: 'security@abc.com',
+  email: 'sanjay@brandguard.internal',
   role: 'Security Analyst',
   status: 'Active',
   lastActive: 'Just now',
@@ -38,7 +38,7 @@ export const teamMembers: User[] = [
   {
     id: 'usr-001',
     name: 'Sanjay',
-    email: 'security@abc.com',
+    email: 'sanjay@brandguard.internal',
     role: 'Admin',
     status: 'Active',
     lastActive: 'Just now',
@@ -52,7 +52,7 @@ export const teamMembers: User[] = [
     role: 'Security Analyst',
     status: 'Active',
     lastActive: '12 mins ago',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=96&auto=format&fit=crop&q=80',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=96&auto=format&fit=crop&q=80',
     department: 'Threat Intelligence',
   },
   {
@@ -62,7 +62,7 @@ export const teamMembers: User[] = [
     role: 'Viewer',
     status: 'Active',
     lastActive: '2 hours ago',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=96&auto=format&fit=crop&q=80',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=96&auto=format&fit=crop&q=80',
     department: 'Legal & Trademark Compliance',
   },
   {

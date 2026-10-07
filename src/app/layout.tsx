@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/layout/ThemeProvider';
 import { ToastProvider } from '@/components/common/ToastProvider';
+import { UserContextProvider } from '@/context/UserContext';
 import { BrandContextProvider } from '@/context/BrandContext';
 
 const geistSans = Geist({
@@ -31,7 +32,9 @@ export default function RootLayout({
       <body className="min-h-screen font-sans bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased selection:bg-blue-600/20 selection:text-blue-600">
         <ThemeProvider>
           <ToastProvider>
-            <BrandContextProvider>{children}</BrandContextProvider>
+            <UserContextProvider>
+              <BrandContextProvider>{children}</BrandContextProvider>
+            </UserContextProvider>
           </ToastProvider>
         </ThemeProvider>
       </body>
