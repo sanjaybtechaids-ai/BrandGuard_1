@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-brand-blue: #007aff;
+  --color-brand-blue-hover: #0066d6;
+  --color-brand-blue-subtle: #eaf3ff;
+  --color-surface-bg: #f5f7fa;
+  --color-card-bg: #ffffff;
+}
+
+:root {
+  --background: #f5f7fa;
+  --foreground: #111827;
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --border: rgba(15, 23, 42, 0.08);
+  --primary-blue: #007aff;
+  --primary-blue-subtle: #eaf3ff;
+}
+
+.dark {
+  --background: #0d1117;
+  --foreground: #f3f4f6;
+  --card: #161b22;
+  --card-foreground: #f3f4f6;
+  --border: rgba(255, 255, 255, 0.08);
+  --primary-blue: #388bfd;
+  --primary-blue-subtle: rgba(56, 139, 253, 0.12);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Apple-style smooth ultra-subtle card shadow */
+.apple-card {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.03);
+  border-radius: 1.25rem; /* 20px */
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.apple-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+/* Subtle scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.2);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.35);
+}
